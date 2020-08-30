@@ -31,14 +31,33 @@ border = 1;
 $fa = 15;
 $fs = min(layer_height/2, xspace(1)/2);
 
-card = [2.5*25.4, 0.325, 3.5*25.4];  // standard playing card dimensions
-double_sleeve = 0.3;
-thick_sleeve = 0.2;
-thin_sleeve = 0.1;
-function double_sleeve_count(d) = floor(d / (card[1] + double_sleeve));
-function thick_sleeve_count(d) = floor(d / (card[1] + thick_sleeve));
-function thin_sleeve_count(d) = floor(d / (card[1] + thin_sleeve));
-function unsleeved_count(d) = floor(d / card[1]);
+inch = 25.4;
+card = [2.5*inch, 3.5*inch];  // standard playing card dimensions
+
+sand_sleeve = [81, 122];  // Dixit
+orange_sleeve = [73, 122];  // Tarot
+magenta_sleeve = [72, 112];  // Scythe
+brown_sleeve = [67, 103];  // 7 Wonders
+lime_sleeve = [82, 82];  // Big Square
+blue_sleeve = [73, 73];  // Square
+dark_blue_sleeve = [53, 53];  // Mini Square
+gray_sleeve = [66, 91];  // Standard Card
+purple_sleeve = [62, 94];  // Standard European
+ruby_sleeve = [46, 71];  // Mini European
+green_sleeve = [59, 91];  // Standard American
+yellow_sleeve = [44, 67];  // Mini American
+catan_sleeve = [56, 82];  // Catan (English)
+
+no_sleeve = 0.35;  // common unsleeved card thickness (UG assumes 0.325)
+thin_sleeve = 0.1;  // 50 micron sleeves
+thick_sleeve = 0.2;  // 100 micron sleeves
+double_sleeve = thick_sleeve + thin_sleeve;
+function double_sleeve_count(d) = floor(d / (no_sleeve + double_sleeve));
+function thick_sleeve_count(d) = floor(d / (no_sleeve + thick_sleeve));
+function thin_sleeve_count(d) = floor(d / (no_sleeve + thin_sleeve));
+function unsleeved_count(d) = floor(d / no_sleeve);
+function vdeck(n=1, sleeve=double_sleeve, card=yellow_sleeve) =
+    [card[0], card[1], n*(no_sleeve+sleeve)];
 
 function unit_axis(n) = [for (i=[0:1:2]) i==n ? 1 : 0];
 
@@ -111,7 +130,7 @@ module rounded_cube(size, thick=thick0, walls=wall0, center=false) {
 }
 
 // TODO: dividers
-module deckbox(out=undef, in=undef, wall=wall0, gap=gap0, join=join0,
+module faction(out=undef, in=undef, wall=wall0, gap=gap0, join=join0,
                seam=seam0, rise=rise0, rounded=true, lid=false, ghost=undef) {
     module side(w, d0, d1, h0, h1) {
         shape = [[0, 0], [0, h0+h1], [d0, h0+h1], [d0+d1, h0], [d0+d1, 0]];
@@ -171,7 +190,7 @@ module deckbox(out=undef, in=undef, wall=wall0, gap=gap0, join=join0,
 
     // reference objects
     %if (ghost) translate([0, box[1], box[2]]) rotate([0, 180, 0])
-        deckbox(out, in, wall, gap, join, seam, rise, lid=!lid, ghost=false);
+        faction(out, in, wall, gap, join, seam, rise, lid=!lid, ghost=false);
     %if (ghost!=false) translate(in0) cube(box-2*in0);
 
     difference() {
@@ -208,9 +227,9 @@ module set(out=undef, in=undef, wall=wall0, gap=gap0, join=join0,
     echo(box);
     echo(box-2*in0);
     translate([box[0]+10, 0, 0])
-        deckbox(out=out, in=in, wall=wall, gap=gap, join=join,
+        faction(out=out, in=in, wall=wall, gap=gap, join=join,
                 seam=seam, rise=rise, rounded=rounded, ghost=ghost) children();
-    deckbox(out=out, in=in, wall=wall, gap=gap, join=join, seam=seam,
+    faction(out=out, in=in, wall=wall, gap=gap, join=join, seam=seam,
             rise=rise, rounded=rounded, lid=true, ghost=ghost) children();
 }
 
@@ -218,52 +237,90 @@ module bevel_test(out, wall=wall0, gap=gap0, rounded=true) {
     box = [out[0], out[1], 2*out[2]];
     flat = round(wall/layer_height) * layer_height;
     difference() {
-        deckbox(out=box, wall=wall, gap=gap, join=out[2]-flat,
+        faction(out=box, wall=wall, gap=gap, join=out[2]-flat,
                 rounded=rounded, lid=true, ghost=false);
         translate([-1/2, -1/2, out[2]]) cube(box+[1,1,1]);
     }
 }
 
-// commercial box sizes
-Boulder100int = [68.5, 67.5, 93];
-Boulder80int = [68.5, 55, 93];
-Boulder60int = [68.5, 46.5, 93];
-Boulder40int = [68.5, 30, 93];
-Boulder100ext = [76, 75, 93];
-Boulder80ext = [76, 60, 98.5];
-Boulder60ext = [76, 49.9, 98.5];
-Boulder40ext = [76, 35, 98.5];
 
-Rocky75 = [75, 300/4, 98.5];
-Rocky60 = [75, 300/5, 98.5];
-Rocky50 = [75, 300/6, 98.5];
-Rocky37 = [75, 300/8, 98.5];
-Rocky33 = [75, 300/9, 98.5];
-Rocky30 = [75, 300/10, 98.5];
-Rocky25 = [75, 300/12, 98.5];
+// box dimensions
+boxlid = [442, 300, 136];
+boxbase = [434, 292, 133];
+interior = [427, 287, 130];
 
-*deckbox(Rocky, ghost=false);
-*deckbox(Rocky, lid=true, ghost=false);
-*deckbox(in=Boulder80, ghost=true);
-*deckbox(in=Boulder80, lid=true);
+sectormm = [106, 143, 62];
+sectorin = [4+3/16, 5+5/8, 2+1/2]*inch;
+// echo(sectormm, sectorin);
 
-*set([25, 40*.6, 60], seam=0.2, rise=0.6);
-*set([25, 25, 25], seam=0.1, rise=0.8);
+// hex dimensions
+stock = 1.75;  // tile stock thickness
+Dhex = 116;  // long diameter across hex
+dhex = 101;  // short diameter across hex
+hex = [Dhex, dhex, stock];  // bounding box of hex tile
 
-*set(Rocky30);
-*deckbox(Rocky30);
-*deckbox(Rocky30, lid=true);
-
-*deckbox(Rocky30, lid=true) {
-    $fa=6;
-    difference() {
-        circle(d=45);
-        circle(d=40);
-    }
-    text("B", font="Palatino Linotype", size=30,
-         halign="center", valign="center");
+module hex(n=1, h=stock, D=undef, d=undef, center=false) {
+    // TODO: make it easier to select minimum bounds (D=116)
+    Dx = is_undef(D) ? Dhex : D;  // 116 default
+    dx = is_undef(d) ? dhex : d;  // 101 default
+    R = max(Dx/2, dx/cos(30)/2);
+    r = max(Dx*cos(30)/2, dx/2);
+    linear_extrude(n*h, center=center)
+        polygon([[R, 0], [R/2, r], [-R/2, r], [-R, 0], [-R/2, -r], [R/2, -r]]);
 }
 
-*bevel_test([25, 25, 5]);
+module flight(n=1, h=3, d=94, Dr=105, Rh=2, Xh=-6.5, center=false) {
+    // TODO: model legs
+    H = n*h;
+    r = d/2;       // indiameter
+    R = r/cos(30);  // circumdiameter
+    Rr = Dr/2;     // circumdiameter after rounding
+    Rc = (R-Rr)*sin(60)/(1-sin(60));  // corner radius
+    Er = R - Rc/sin(60);  // edge after rounding
+    translate([0, 0, center ? 0 : H/2]) difference() {
+        hull() for (a=[0:120:359]) rotate(a) {
+            // position the rounded corners to create the total Dr distance
+            for (s=[1,-1]) translate([s*(Rr-Rc), 0, 0])
+                cylinder(h=H, r=Rc, center=true);
+            // connect the corners with solid sides
+            rotate(30) cube([d, Er, H], center=true);
+        }
+        // subtract the leg holes
+        for (a=[0:120:359]) rotate(a) {
+            translate([Rr+Xh, 0, 0]) cylinder(h=2*H, r=Rh, center=true);
+        }
+    }
+    // holes are 2mm radius, set 6.5mm from rounded corner
+}
 
-*rounded_cube(Rocky30);
+// index: 0 = base, 1 = expansion 1, etc.
+deck_faction = [6, 6];
+deck_public = [10, 10];
+deck_secret = [20, 20];
+deck_objective = 2*deck_public + deck_secret;
+deck_action = [80, 20];
+deck_agenda = [50, 13];
+deck_planet = [32, 32];  // expansion planet cards TBD
+deck_explore = [0, 84];
+deck_common = deck_objective + deck_action + deck_agenda + deck_planet +
+              deck_explore;
+echo(deck_common);
+
+function sum(v) = [for (p=v) 1] * v;
+
+module deck(n=1, sleeve=double_sleeve, card=yellow_sleeve, center=false) {
+    cards = is_list(n) ? sum(n) : n;
+    v = vdeck(cards, sleeve, card);
+    origin = [0, 0, center ? 0 : v[2]/2];
+    translate(origin) cube(v, center=true);
+    echo(cards, v);
+}
+
+%hex();
+%flight();
+
+deck(deck_objective);
+
+*faction([75, 30, 98.5]);
+*faction([75, 60, 98.5]);
+*faction([75, 75, 98.5]);
