@@ -300,7 +300,7 @@ deck_secret = [20, 20];
 deck_objective = 2*deck_public + deck_secret;
 deck_action = [80, 20];
 deck_agenda = [50, 13];
-deck_planet = [32, 32];  // expansion planet cards TBD
+deck_planet = [32, 22];  // expansion planet cards TBD, assume 1/tile
 deck_explore = [0, 84];
 deck_common = deck_objective + deck_action + deck_agenda + deck_planet +
               deck_explore;
@@ -316,11 +316,47 @@ module deck(n=1, sleeve=double_sleeve, card=yellow_sleeve, center=false) {
     echo(cards, v);
 }
 
-%hex();
-%flight();
+tiles = 32 + 22 + 9 + 1;
+flights = 16;  // 8 fit in player boxes
+%hex(tiles);
+%translate([0, 0, tiles*stock]) flight(flights);
+echo(287 - tiles*stock + flights*3);
 
-deck(deck_objective);
+module boxbase(center=false) {
+    origin = [0, 0, center ? 0 : boxbase[2]/2];
+    translate(origin) difference() {
+        cube(boxbase, center=true);
+        translate([0, 0, boxbase[2]-interior[2]])
+            cube([interior[0], interior[1], boxbase[2]], center=true);
+    }
+}
+
+%rotate([90, 0, 90]) translate([0, interior[1]/2, (interior[2]-boxbase[2])/2])
+    boxbase(center=true);
+
+zz = tiles*stock + flights*3;
+translate([-65, 25, zz+34.5]) rotate([90, 0, 90]) deck(deck_action/2);
+translate([-65, -25, zz+34.5]) rotate([90, 0, 90]) deck(deck_action/2);
+translate([-65+33.5, 25, zz+34.5]) rotate([90, 0, 90]) deck(deck_secret);
+translate([-65+33.5, -25, zz+34.5]) rotate([90, 0, 90]) deck(2*deck_public);
+translate([-65+33.5+27, 25, zz+34.5]) rotate([90, 0, 90]) deck(deck_explore/4);
+translate([-65+33.5+27, -25, zz+34.5]) rotate([90, 0, 90]) deck(deck_explore/4);
+translate([-65+33.5+27+14.65, 25, zz+34.5]) rotate([90, 0, 90])
+    deck(deck_explore/4);
+translate([-65+33.5+27+14.65, -25, zz+34.5]) rotate([90, 0, 90])
+    deck(deck_explore/4);
+translate([-65+33.5, 25, zz+1+68]) rotate(90) deck(deck_agenda);
+translate([-65+33.5, -25, zz+1+68]) rotate(90) deck(deck_planet);
+*rotate(90) deck(deck_common);
 
 *faction([75, 30, 98.5]);
 *faction([75, 60, 98.5]);
 *faction([75, 75, 98.5]);
+
+echo(interior/(Dhex+5));
+echo(interior/(dhex+5));
+echo(interior[1]-3*94);
+echo(interior[1]-2*116);
+echo(interior[1]-zz);
+echo(32.5+26+13.65*2+40.95);
+echo(130/3);
