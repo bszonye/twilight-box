@@ -100,7 +100,19 @@ module beveled_cube(size, flats=1, walls=1, center=false) {
     }
 }
 
-module rounded_cube(size, thick=thick0, walls=wall0, center=false) {
+module rounded_cube(size, r=thick0, center=false) {
+    origin = [0, 0, center ? 0 : size[2]/2];
+    translate(origin) hull() {
+        for (s0=[1,-1]) for (s1=[1,-1]) {
+            translate([s0*(size[0]/2-r), s1*(size[1]/2-r), 0])
+                cylinder(h=size[2], r=r, center=true);
+        }
+        cube([size[0]-2*r, size[1], size[2]], center=true);
+        cube([size[0], size[1]-2*r, size[2]], center=true);
+    }
+}
+
+module triple_rounded_cube(size, thick=thick0, walls=wall0, center=false) {
     R = max(thick, walls);
     B = min(thick, walls);
     L = B*sqrt(2)/2;
@@ -207,7 +219,7 @@ module faction(out=undef, in=undef, wall=wall0, gap=gap0, join=join0,
                 box(thick);  // wall
                 box(wall, join, inset);  // joint
             }
-            if (rounded) rounded_cube(box, thick, wall);
+            if (rounded) triple_rounded_cube(box, thick, wall);
             else beveled_cube(box, thick, xspace(2));
         }
         translate([box[0]/2, 0, (z0+z1+(lid?join:0))/2])
@@ -248,7 +260,7 @@ module bevel_test(out, wall=wall0, gap=gap0, rounded=true) {
 boxlid = [442, 300, 136];
 boxbase = [434, 292, 133];
 interior = [427, 287, 130];
-sector = [(interior[0]-3)/4, (interior[1]-2)/3, (interior[2]-10)/2];
+sector = [(interior[0]-3)/4, (interior[1]-5)/6, (interior[2]-10)/2];
 
 // hex dimensions
 stock = 1.75;  // tile stock thickness
@@ -274,7 +286,6 @@ leg_rise = leg_head[1] + leg_post[1] + leg_washer[1];
 leg_height = 2*leg_head[1] + leg_post[1] + leg_washer[1];
 table_size = [105, 94, 3];
 stand_height = leg_height + table_size[2];
-echo(stand_height);
 
 module leg(gap=gap0, center=false) {
     post = leg_post;
@@ -296,36 +307,42 @@ module leg(gap=gap0, center=false) {
     }
 }
 
-module stand(n=1, h=table_size[2], d=table_size[1], Dr=table_size[0],
-             Rl=leg_thread, Xl=6.5, legs=false, center=false) {
-    H = n*h;
+module rounded_hex(h=table_size[2], d=table_size[1], Dr=table_size[0],
+                   center=false) {
     r = d/2;       // indiameter
     R = r/cos(30);  // circumdiameter
     Rr = Dr/2;     // circumdiameter after rounding
     Rc = (R-Rr)*sin(60)/(1-sin(60));  // corner radius
     Er = R - Rc/sin(60);  // edge after rounding
+    origin = [0, 0, center ? 0 : h/2];
+    translate(origin) hull() for (a=[0:120:359]) rotate(a) {
+        // position the rounded corners to create the total Dr distance
+        for (s=[1,-1]) translate([s*(Rr-Rc), 0, 0])
+            cylinder(h=h, r=Rc, center=true);
+        // connect the corners with solid sides
+        rotate(30) cube([d, Er, h], center=true);
+    }
+}
+
+module stand(n=1, h=table_size[2], d=table_size[1], Dr=table_size[0],
+             Rl=leg_thread/2, Xl=6.5, legs=false, center=false) {
+    H = n*h;
     origin = [0, 0, center ? 0 : (H + (legs? leg_height : 0)) / 2];
     rise = legs ? leg_rise - leg_height/2 : 0;
     translate(origin) {
         translate([0, 0, rise]) color("aquamarine", 1/4) difference() {
-            hull() for (a=[0:120:359]) rotate(a) {
-                // position the rounded corners to create the total Dr distance
-                for (s=[1,-1]) translate([s*(Rr-Rc), 0, 0])
-                    cylinder(h=H, r=Rc, center=true);
-                // connect the corners with solid sides
-                rotate(30) cube([d, Er, H], center=true);
-            }
+            rounded_hex(h=H, d=d, Dr=Dr, center=true);
             // subtract the leg holes
             // holes are 2mm radius, set 6.5mm from rounded corner
             for (a=[0:120:359]) rotate(a) {
-                translate([Rr-Xl, 0, 0]) {
+                translate([Dr/2-Xl, 0, 0]) {
                     cylinder(h=2*H, r=Rl, center=true);
                 }
             }
         }
         // draw legs
         if (legs) for (a=[0:120:359]) rotate(a) {
-            translate([Rr-Xl, 0, 0]) leg(gap=H, center=true);
+            translate([Dr/2-Xl, 0, 0]) leg(gap=H, center=true);
         }
     }
 }
@@ -371,7 +388,7 @@ module theater(center=false) {
     color("navy", 0.5) translate(origin) difference() {
         cube(boxlid, center=true);
         cube([interior[0], interior[1], interior[2]], center=true);
-        for (x=[-1.5:1:1.5]) for (y=[-1:1:1])
+        for (x=[-1.5:1:1.5]) for (y=[-2.5:1:2.5])
             translate([x*(sector[0]+1), y*(sector[1]+1), 0]) {
             cube([sector[0], sector[1], 2*boxlid[2]], center=true);
             cube([sector[0], 2*boxlid[1], interior[2]], center=true);
@@ -408,8 +425,99 @@ zz = tiles*stock + flights*3;
 *faction([75, 60, 98.5]);
 *faction([75, 75, 98.5]);
 
-theater(center=false);
-
-for (x=[-1.5:1:1.5]) for (y=[-1:1:1]) for (z=[0:1:1])
+*for (x=[-1.5:1:1.5]) for (y=[-1:1:1]) for (z=[0:1:1])
     translate([x*(sector[0]+1), y*(sector[1]+1), z*stand_height])
         rotate(z*180) stand(legs=true);
+
+module leg_stack(w=3, h=1, gap=gap0, center=false) {
+    dr = leg_head[0] - leg_post[0]/2 + gap;
+    dy = leg_head[1] + leg_washer[1] + gap;
+    dW = dr*(w-1);
+    dH = dr*(h-1);
+    W = leg_head[0] + dW;
+    H = leg_head[0] + dH;
+    D = leg_height + gap + dy;
+    echo("leg stack", w, h, [W, D, H]);
+
+    origin = [-dW/2, 0, center ? -dH/2 : leg_head[0]/2];
+    translate(origin) for (x=[0:1:w-1]) for (z=[0:1:h-1]) {
+        flip = (x+z) % 2;
+        translate([dr*x, dy*(flip-0.5), dr*z]) rotate([90-180*flip, 0, 0])
+            leg(gap=gap, center=true);
+    }
+}
+
+module stand_tray(n=8, wall=wall0, thick=thick0, gap=gap0, preview=true,
+                  center=false) {
+    flat = round(wall/layer_height) * layer_height;
+    xflat = round(thick/layer_height) * layer_height;
+    echo(flat, xflat);
+    size = [sector[0], 3*sector[1]+2, flat+xflat+n*table_size[2]];
+    w = size[0];
+    d = size[1];
+    h = size[2];
+    echo("stand tray", size);
+    origin = [0, 0, center ? -h/2: 0];
+    translate(origin) {
+        // tray
+        // TODO: do something interesting with hex corners
+        color("slategray") difference() {
+            translate([0, 0, h/2]) rounded_cube(size, center=true);
+            dhex = 2*sector[1]+1;
+            Dhex = dhex/cos(30);
+            translate([0, -(sector[1]+1)/2, xflat+h/2]) {  // thicker
+                hex(h=h, d=dhex, D=Dhex, center=true);
+                translate([0, 0, h/2]) {
+                    // align & round tile cutouts
+                    cut = 2*thick;
+                    cut30 = 2*(cut+(Dhex-w)/2)*cos(30)/sin(30);
+                    cut60 = 2*cut*cos(60)/sin(60);
+                    rotate([0, 90, 0])
+                        rounded_cube([2*h, cut30, 2*w], cut30/3, center=true);
+                    translate([0, thick/2-dhex/2, 0]) rotate([90, 0, 0])
+                        rounded_cube([Dhex/2+cut60, 2*h, 2*cut],
+                                     cut60/2, center=true);
+                    // finger holds
+                    translate([0, 0, h/2-xflat]) for (s=[1,-1]) {
+                        x0 = s*(w/2-thick);
+                        y0p = dhex/2;
+                        y0n = dhex/2-thick;
+                        y1 = cut30/2+thick;
+                        x1 = s*(Dhex/2+thick/cos(30)-y1*tan(30));
+                        x2p = x1-s*(y0p-y1)*tan(30);
+                        x2n = s*(Dhex/4+cut60/2+thick);
+                        y1n = y1-s*(x2n-x1)*tan(60);
+                        linear_extrude(2*h, center=true) {
+                            polygon([[x0,y0p], [x0,y1], [x1,y1], [x2p,y0p]]);
+                            polygon([[x0,-y0n], [x0,-y1], [x1,-y1], [x2n,-y1n],
+                                     [x2n,-y0n]]);
+                        }
+                    }
+                }
+            }
+            // scoop inside corners
+            vlegs = [sector[0]-2*thick, sector[1]+1-2*thick, h];
+            scoop = leg_head[0]/2;
+            translate([0, sector[1]+1/2, h+flat]) rotate([0, 90, 0])
+                rounded_cube([2*vlegs[2], vlegs[1], vlegs[0]], scoop,
+                             center=true);
+            echo("leg compartment", vlegs);
+        }
+        // contents
+        if (preview) {
+            translate([0, -(sector[1]+1)/2, xflat])
+                stand(n, center=false);
+            for (s=[1,-1])
+                translate([s*(sector[0]-leg_head[0])/4, sector[1]+1/2, flat])
+                rotate(90) leg_stack(w=5, h=ceil(3*n/10), center=false);
+        }
+    }
+}
+
+// TODO: module to arrange stuff more easily?
+
+*theater(center=false);
+for (s=[1,-1]) translate([0.5*(sector[0]+1), s*1.5*(sector[1]+1), 0])
+    rotate(90+s*90) stand_tray(preview=true);
+
+*stand_tray(preview=false);
