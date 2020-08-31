@@ -248,10 +248,7 @@ module bevel_test(out, wall=wall0, gap=gap0, rounded=true) {
 boxlid = [442, 300, 136];
 boxbase = [434, 292, 133];
 interior = [427, 287, 130];
-
-sectormm = [106, 143, 62];
-sectorin = [4+3/16, 5+5/8, 2+1/2]*inch;
-// echo(sectormm, sectorin);
+sector = [(interior[0]-3)/4, (interior[1]-2)/3, (interior[2]-10)/2];
 
 // hex dimensions
 stock = 1.75;  // tile stock thickness
@@ -269,28 +266,68 @@ module hex(n=1, h=stock, D=undef, d=undef, center=false) {
         polygon([[R, 0], [R/2, r], [-R/2, r], [-R, 0], [-R/2, -r], [R/2, -r]]);
 }
 
-module flight(n=1, h=3, d=94, Dr=105, Rh=2, Xh=-6.5, center=false) {
-    // TODO: model legs
+leg_head = [10.2, 1.5];
+leg_post = [4.9, 38];
+leg_washer = [8, 1];
+leg_thread = 4;
+leg_rise = leg_head[1] + leg_post[1] + leg_washer[1];
+leg_height = 2*leg_head[1] + leg_post[1] + leg_washer[1];
+table_size = [105, 94, 3];
+stand_height = leg_height + table_size[2];
+echo(stand_height);
+
+module leg(gap=gap0, center=false) {
+    post = leg_post;
+    head = leg_head;
+    washer = leg_washer;
+    thread = [leg_thread, gap];
+    h = 2*head[1] + post[1] + thread[1] + washer[1];
+    origin = [0, 0, center ? 0 : h/2];
+    translate(origin) {
+        color("dimgray") {
+            cylinder(h=h, d=thread[0], center=true);
+            translate([0, 0, (post[1]+head[1]+washer[1]-h)/2])
+                cylinder(h=post[1]+head[1]+washer[1], d=post[0], center=true);
+            for (s=[1,-1]) translate([0, 0, s*(h-head[1])/2])
+                cylinder(h=head[1], d=head[0], center=true);
+        }
+        translate([0, 0, (h-washer[1])/2-head[1]-thread[1]])
+            color("white") cylinder(h=washer[1], d=washer[0], center=true);
+    }
+}
+
+module stand(n=1, h=table_size[2], d=table_size[1], Dr=table_size[0],
+             Rl=leg_thread, Xl=6.5, legs=false, center=false) {
     H = n*h;
     r = d/2;       // indiameter
     R = r/cos(30);  // circumdiameter
     Rr = Dr/2;     // circumdiameter after rounding
     Rc = (R-Rr)*sin(60)/(1-sin(60));  // corner radius
     Er = R - Rc/sin(60);  // edge after rounding
-    translate([0, 0, center ? 0 : H/2]) difference() {
-        hull() for (a=[0:120:359]) rotate(a) {
-            // position the rounded corners to create the total Dr distance
-            for (s=[1,-1]) translate([s*(Rr-Rc), 0, 0])
-                cylinder(h=H, r=Rc, center=true);
-            // connect the corners with solid sides
-            rotate(30) cube([d, Er, H], center=true);
+    origin = [0, 0, center ? 0 : (H + (legs? leg_height : 0)) / 2];
+    rise = legs ? leg_rise - leg_height/2 : 0;
+    translate(origin) {
+        translate([0, 0, rise]) color("aquamarine", 1/4) difference() {
+            hull() for (a=[0:120:359]) rotate(a) {
+                // position the rounded corners to create the total Dr distance
+                for (s=[1,-1]) translate([s*(Rr-Rc), 0, 0])
+                    cylinder(h=H, r=Rc, center=true);
+                // connect the corners with solid sides
+                rotate(30) cube([d, Er, H], center=true);
+            }
+            // subtract the leg holes
+            // holes are 2mm radius, set 6.5mm from rounded corner
+            for (a=[0:120:359]) rotate(a) {
+                translate([Rr-Xl, 0, 0]) {
+                    cylinder(h=2*H, r=Rl, center=true);
+                }
+            }
         }
-        // subtract the leg holes
-        for (a=[0:120:359]) rotate(a) {
-            translate([Rr+Xh, 0, 0]) cylinder(h=2*H, r=Rh, center=true);
+        // draw legs
+        if (legs) for (a=[0:120:359]) rotate(a) {
+            translate([Rr-Xl, 0, 0]) leg(gap=H, center=true);
         }
     }
-    // holes are 2mm radius, set 6.5mm from rounded corner
 }
 
 // index: 0 = base, 1 = expansion 1, etc.
@@ -304,7 +341,6 @@ deck_planet = [32, 22];  // expansion planet cards TBD, assume 1/tile
 deck_explore = [0, 84];
 deck_common = deck_objective + deck_action + deck_agenda + deck_planet +
               deck_explore;
-echo(deck_common);
 
 function sum(v) = [for (p=v) 1] * v;
 
@@ -318,9 +354,8 @@ module deck(n=1, sleeve=double_sleeve, card=yellow_sleeve, center=false) {
 
 tiles = 32 + 22 + 9 + 1;
 flights = 16;  // 8 fit in player boxes
-%hex(tiles);
-%translate([0, 0, tiles*stock]) flight(flights);
-echo(287 - tiles*stock + flights*3);
+*hex(tiles);
+*translate([0, 0, tiles*stock]) stand(flights);
 
 module boxbase(center=false) {
     origin = [0, 0, center ? 0 : boxbase[2]/2];
@@ -331,32 +366,50 @@ module boxbase(center=false) {
     }
 }
 
-%rotate([90, 0, 90]) translate([0, interior[1]/2, (interior[2]-boxbase[2])/2])
+module theater(center=false) {
+    origin = [0, 0, center ? 0 : interior[2]/2];
+    color("navy", 0.5) translate(origin) difference() {
+        cube(boxlid, center=true);
+        cube([interior[0], interior[1], interior[2]], center=true);
+        for (x=[-1.5:1:1.5]) for (y=[-1:1:1])
+            translate([x*(sector[0]+1), y*(sector[1]+1), 0]) {
+            cube([sector[0], sector[1], 2*boxlid[2]], center=true);
+            cube([sector[0], 2*boxlid[1], interior[2]], center=true);
+            cube([2*boxlid[0], sector[1], interior[2]], center=true);
+        }
+    }
+}
+
+*rotate([90, 0, 90]) translate([0, interior[1]/2, (interior[2]-boxbase[2])/2])
     boxbase(center=true);
 
 zz = tiles*stock + flights*3;
-translate([-65, 25, zz+34.5]) rotate([90, 0, 90]) deck(deck_action/2);
-translate([-65, -25, zz+34.5]) rotate([90, 0, 90]) deck(deck_action/2);
-translate([-65+33.5, 25, zz+34.5]) rotate([90, 0, 90]) deck(deck_secret);
-translate([-65+33.5, -25, zz+34.5]) rotate([90, 0, 90]) deck(2*deck_public);
-translate([-65+33.5+27, 25, zz+34.5]) rotate([90, 0, 90]) deck(deck_explore/4);
-translate([-65+33.5+27, -25, zz+34.5]) rotate([90, 0, 90]) deck(deck_explore/4);
-translate([-65+33.5+27+14.65, 25, zz+34.5]) rotate([90, 0, 90])
+*translate([-65, 25, zz+34.5]) rotate([90, 0, 90])
+    deck(deck_action/2);
+*translate([-65, -25, zz+34.5]) rotate([90, 0, 90])
+    deck(deck_action/2);
+*translate([-65+33.5, 25, zz+34.5]) rotate([90, 0, 90])
+    deck(deck_secret);
+*translate([-65+33.5, -25, zz+34.5]) rotate([90, 0, 90])
+    deck(2*deck_public);
+*translate([-65+33.5+27, 25, zz+34.5]) rotate([90, 0, 90])
     deck(deck_explore/4);
-translate([-65+33.5+27+14.65, -25, zz+34.5]) rotate([90, 0, 90])
+*translate([-65+33.5+27, -25, zz+34.5]) rotate([90, 0, 90])
     deck(deck_explore/4);
-translate([-65+33.5, 25, zz+1+68]) rotate(90) deck(deck_agenda);
-translate([-65+33.5, -25, zz+1+68]) rotate(90) deck(deck_planet);
+*translate([-65+33.5+27+14.65, 25, zz+34.5]) rotate([90, 0, 90])
+    deck(deck_explore/4);
+*translate([-65+33.5+27+14.65, -25, zz+34.5]) rotate([90, 0, 90])
+    deck(deck_explore/4);
+*translate([-65+33.5, 25, zz+1+68]) rotate(90) deck(deck_agenda);
+*translate([-65+33.5, -25, zz+1+68]) rotate(90) deck(deck_planet);
 *rotate(90) deck(deck_common);
 
 *faction([75, 30, 98.5]);
 *faction([75, 60, 98.5]);
 *faction([75, 75, 98.5]);
 
-echo(interior/(Dhex+5));
-echo(interior/(dhex+5));
-echo(interior[1]-3*94);
-echo(interior[1]-2*116);
-echo(interior[1]-zz);
-echo(32.5+26+13.65*2+40.95);
-echo(130/3);
+theater(center=false);
+
+for (x=[-1.5:1:1.5]) for (y=[-1:1:1]) for (z=[0:1:1])
+    translate([x*(sector[0]+1), y*(sector[1]+1), z*stand_height])
+        rotate(z*180) stand(legs=true);
