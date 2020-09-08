@@ -447,12 +447,12 @@ module leg_stack(w=3, h=1, gap=gap0, center=false) {
     }
 }
 
-module stand_tray(n=8, wall=wall0, thick=thick0, gap=gap0, preview=true,
+module stand_tray(n=8, wall=xwall(4), thick=xwall(4), gap=gap0, preview=true,
                   center=false) {
     flat = round(wall/layer_height) * layer_height;
     xflat = round(thick/layer_height) * layer_height;
     echo(flat, xflat);
-    size = [sector[0], 3*sector[1]+2, flat+xflat+n*table_size[2]];
+    size = [sector[0], 3*sector[1]+2, 1+ceil(xflat+n*table_size[2])];
     w = size[0];
     d = size[1];
     h = size[2];
@@ -517,7 +517,7 @@ module stand_tray(n=8, wall=wall0, thick=thick0, gap=gap0, preview=true,
 // TODO: module to arrange stuff more easily?
 
 *theater(center=false);
-*for (s=[1,-1]) translate([0.5*(sector[0]+1), s*1.5*(sector[1]+1), 0])
+for (s=[1,-1]) translate([0.5*(sector[0]+1), s*1.5*(sector[1]+1), 0])
     rotate(90+s*90) stand_tray(preview=true);
 
 *stand_tray(preview=false);
@@ -543,4 +543,4 @@ module wall_test() {
     translate([0, l-flat, 0]) cube([wx, 1.6, h]);
 }
 
-wall_test();
+*wall_test();
