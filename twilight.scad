@@ -517,7 +517,30 @@ module stand_tray(n=8, wall=wall0, thick=thick0, gap=gap0, preview=true,
 // TODO: module to arrange stuff more easily?
 
 *theater(center=false);
-for (s=[1,-1]) translate([0.5*(sector[0]+1), s*1.5*(sector[1]+1), 0])
+*for (s=[1,-1]) translate([0.5*(sector[0]+1), s*1.5*(sector[1]+1), 0])
     rotate(90+s*90) stand_tray(preview=true);
 
 *stand_tray(preview=false);
+
+module wall_test() {
+    pitch = 10;
+    l = 60;
+    h = 25;
+    n = 6;
+    gap = 10;
+    wx = (n-1)*pitch + xwall(n);
+    for (w=[1:1:n]) {
+        wall = xwall(w);
+        flat = round(wall/layer_height) * layer_height;
+        echo(wall, flat);
+        translate([pitch*(w-1), 0, 0]) cube([wall, (l-gap)/2, h]);
+        translate([pitch*(w-1), (l+gap)/2, 0]) cube([flat, (l-gap)/2, h]);
+    }
+    wall = xwall(4);
+    flat = round(wall/layer_height) * layer_height;
+    cube([wx, l, flat]);
+    cube([wx, wall, h]);
+    translate([0, l-flat, 0]) cube([wx, 1.6, h]);
+}
+
+wall_test();
