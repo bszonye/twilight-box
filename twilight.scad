@@ -358,6 +358,7 @@ deck_planet = [32, 22];  // expansion planet cards TBD, assume 1/tile
 deck_explore = [0, 84];
 deck_common = deck_objective + deck_action + deck_agenda + deck_planet +
               deck_explore;
+echo(deck_common);
 
 function sum(v) = [for (p=v) 1] * v;
 
@@ -462,7 +463,7 @@ module stand_tray(n=8, wall=xwall(4), thick=xwall(4), gap=gap0, preview=true,
         // tray
         // TODO: do something interesting with hex corners
         color("slategray") difference() {
-            translate([0, 0, h/2]) rounded_cube(size, center=true);
+            translate([0, 0, h/2]) rounded_cube(size, r=thick, center=true);
             dhex = 2*sector[1]+1;
             Dhex = dhex/cos(30);
             translate([0, -(sector[1]+1)/2, xflat+h/2]) {  // thicker
@@ -514,14 +515,6 @@ module stand_tray(n=8, wall=xwall(4), thick=xwall(4), gap=gap0, preview=true,
     }
 }
 
-// TODO: module to arrange stuff more easily?
-
-*theater(center=false);
-for (s=[1,-1]) translate([0.5*(sector[0]+1), s*1.5*(sector[1]+1), 0])
-    rotate(90+s*90) stand_tray(preview=true);
-
-*stand_tray(preview=false);
-
 module wall_test() {
     pitch = 10;
     l = 60;
@@ -543,4 +536,11 @@ module wall_test() {
     translate([0, l-flat, 0]) cube([wx, 1.6, h]);
 }
 
+// TODO: module to arrange stuff more easily?
+
+theater(center=false);
+for (s=[1,-1]) translate([0.5*(sector[0]+1), s*1.5*(sector[1]+1), 0])
+    rotate(90+s*90) stand_tray(preview=true);
+
+*stand_tray(preview=false);
 *wall_test();
